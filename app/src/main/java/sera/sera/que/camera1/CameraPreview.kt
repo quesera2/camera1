@@ -131,15 +131,15 @@ class CameraPreview @JvmOverloads constructor(
     }
 
     private inner class Callback : SurfaceHolder.Callback {
-        override fun surfaceCreated(surface: SurfaceHolder?) {
+        override fun surfaceCreated(holder: SurfaceHolder?) {
             surfaceAvailable = true
             startIfReady()
         }
 
-        override fun surfaceChanged(surface: SurfaceHolder?, format: Int, width: Int, height: Int) {
+        override fun surfaceChanged(holder: SurfaceHolder?, format: Int, width: Int, height: Int) {
         }
 
-        override fun surfaceDestroyed(surface: SurfaceHolder?) {
+        override fun surfaceDestroyed(holder: SurfaceHolder?) {
         }
     }
 }
