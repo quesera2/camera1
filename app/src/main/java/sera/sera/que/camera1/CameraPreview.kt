@@ -2,11 +2,15 @@ package sera.sera.que.camera1
 
 import android.Manifest
 import android.content.Context
+import android.content.res.Configuration
 import android.hardware.Camera
+import android.hardware.Camera.CameraInfo
 import android.util.AttributeSet
 import android.util.Log
+import android.view.Surface
 import android.view.SurfaceHolder
 import android.view.SurfaceView
+import android.view.WindowManager
 import android.widget.FrameLayout
 import androidx.annotation.RequiresPermission
 
@@ -27,6 +31,9 @@ class CameraPreview @JvmOverloads constructor(
     private var startRequested: Boolean = false
     private var surfaceAvailable: Boolean = false
 
+    private val isPortraitMode: Boolean
+        get() = resources.configuration.orientation != Configuration.ORIENTATION_LANDSCAPE
+
     init {
         surfaceView.holder.addCallback(Callback())
         addView(surfaceView)
@@ -35,9 +42,7 @@ class CameraPreview @JvmOverloads constructor(
     @RequiresPermission(Manifest.permission.CAMERA)
     fun open() {
         if (camera == null) {
-            Log.i(tag, "open camera")
-            val backCameraId = findBackCameraId()
-            camera = Camera.open(backCameraId)
+            setupCamera()
 
             startRequested = true
             startIfReady()
@@ -65,11 +70,45 @@ class CameraPreview @JvmOverloads constructor(
         }
     }
 
-    private fun findBackCameraId(): Int = (0..Camera.getNumberOfCameras())
+    private fun setupCamera() {
+        Log.i(tag, "open camera")
+        val (backCameraId, cameraInfo) = findBackCameraId()
+        val camera = Camera.open(backCameraId)
+        if (camera != null) {
+            val (angle, displayAngle) = getRotation(cameraInfo)
+            camera.setDisplayOrientation(displayAngle)
+            val params = camera.parameters
+            params.setRotation(angle)
+            camera.parameters = params
+        }
+        this.camera = camera
+    }
+
+    private fun findBackCameraId(): Pair<Int, CameraInfo> = (0..Camera.getNumberOfCameras())
         .asSequence()
         .map { cameraId -> cameraId to Camera.CameraInfo().also { Camera.getCameraInfo(cameraId, it) } }
         .first { it.second.facing == Camera.CameraInfo.CAMERA_FACING_BACK }
-        .first
+
+    private fun getRotation(cameraInfo: CameraInfo): Pair<Int, Int> {
+        val windowManager = context.getSystemService(WindowManager::class.java)
+        val rotation = windowManager.defaultDisplay.rotation
+        val degrees = when (rotation) {
+            Surface.ROTATION_0 -> 0
+            Surface.ROTATION_90 -> 90
+            Surface.ROTATION_180 -> 180
+            Surface.ROTATION_270 -> 270
+            else -> throw RuntimeException("unknown rotation")
+        }
+
+        return if (cameraInfo.facing == Camera.CameraInfo.CAMERA_FACING_FRONT) {
+            val angle = (cameraInfo.orientation + degrees) % 360
+            val displayAngle = (360 - angle) % 360
+            angle to displayAngle
+        } else {
+            val angle = (cameraInfo.orientation - degrees + 360) % 360
+            angle to angle
+        }
+    }
 
     private inner class Callback : SurfaceHolder.Callback {
         override fun surfaceCreated(surface: SurfaceHolder?) {
