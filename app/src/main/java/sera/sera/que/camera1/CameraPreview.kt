@@ -13,6 +13,7 @@ import android.view.SurfaceView
 import android.view.WindowManager
 import android.widget.FrameLayout
 import androidx.annotation.RequiresPermission
+import androidx.core.content.ContextCompat
 import kotlin.math.max
 
 @Suppress("deprecation")
@@ -91,7 +92,8 @@ class CameraPreview @JvmOverloads constructor(
         .first { it.second.facing == Camera.CameraInfo.CAMERA_FACING_BACK }
 
     private fun getRotation(cameraInfo: CameraInfo): Pair<Int, Int> {
-        val windowManager = context.getSystemService(WindowManager::class.java)
+        val windowManager = ContextCompat.getSystemService(context, WindowManager::class.java)
+            ?: throw RuntimeException("window manager not found.")
         val rotation = windowManager.defaultDisplay.rotation
         val degrees = when (rotation) {
             Surface.ROTATION_0 -> 0
