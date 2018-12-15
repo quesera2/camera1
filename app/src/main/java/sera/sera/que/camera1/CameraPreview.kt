@@ -13,7 +13,7 @@ import android.view.SurfaceView
 import android.view.WindowManager
 import android.widget.FrameLayout
 import androidx.annotation.RequiresPermission
-
+import kotlin.math.max
 
 @Suppress("deprecation")
 class CameraPreview @JvmOverloads constructor(
@@ -80,6 +80,7 @@ class CameraPreview @JvmOverloads constructor(
             val params = camera.parameters
             params.setRotation(angle)
             camera.parameters = params
+            desiredPictureSize(camera)
         }
         this.camera = camera
     }
@@ -107,6 +108,25 @@ class CameraPreview @JvmOverloads constructor(
         } else {
             val angle = (cameraInfo.orientation - degrees + 360) % 360
             angle to angle
+        }
+    }
+
+    private fun desiredPictureSize(camera: Camera) {
+        // 長辺が requireSize より短い PictureSize を探す
+        val requiredSize = 1500
+        val parameters = camera.parameters
+        val size = parameters
+            .supportedPictureSizes
+            .mapNotNull {
+                val shortSide = max(it.width, it.height)
+                if (shortSide <= requiredSize) shortSide to it else null
+            }
+            .maxBy { it.first }
+            ?.second
+
+        if (size != null) {
+            parameters.setPictureSize(size.width, size.height)
+            Log.d(tag, "picture size ${size.width}, ${size.height}")
         }
     }
 
