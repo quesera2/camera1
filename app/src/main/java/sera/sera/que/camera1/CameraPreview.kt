@@ -16,6 +16,7 @@ import androidx.annotation.RequiresPermission
 import androidx.core.content.ContextCompat
 import kotlin.math.max
 
+
 @Suppress("deprecation")
 class CameraPreview @JvmOverloads constructor(
     context: Context,
@@ -82,6 +83,7 @@ class CameraPreview @JvmOverloads constructor(
             params.setRotation(angle)
             camera.parameters = params
             desiredPictureSize(camera)
+            requestLayout()
         }
         this.camera = camera
     }
@@ -129,6 +131,38 @@ class CameraPreview @JvmOverloads constructor(
         if (size != null) {
             parameters.setPictureSize(size.width, size.height)
             Log.d(tag, "picture size ${size.width}, ${size.height}")
+        }
+    }
+
+    override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+
+        val previewSize = camera?.parameters?.previewSize
+        var (width, height) = if (previewSize != null) {
+            previewSize.width.toFloat() to previewSize.height.toFloat()
+        } else {
+            320.0f to 240.0f
+        }
+
+        // Swap width and height sizes when in portrait, since it will be rotated 90 degrees
+        if (isPortraitMode) {
+            width = height.also { height = width }
+        }
+
+        val layoutWidth = (right - left).toFloat()
+        val layoutHeight = (bottom - top).toFloat()
+
+
+        val fitHeight = layoutWidth / width * height
+        val (childWidth, childHeight) = if (fitHeight > layoutHeight) {
+            // If height is too tall using fit width, does fit height instead.
+            (layoutHeight / height * width) to layoutHeight
+        } else {
+            // Computes height and width for potentially doing fit width.
+            layoutWidth to fitHeight
+        }
+
+        for (i in 0 until childCount) {
+            getChildAt(i).layout(0, 0, childWidth.toInt(), childHeight.toInt())
         }
     }
 
