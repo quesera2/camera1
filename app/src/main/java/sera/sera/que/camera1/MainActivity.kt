@@ -3,6 +3,7 @@ package sera.sera.que.camera1
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -13,14 +14,20 @@ class MainActivity : AppCompatActivity() {
 
     private val requestCamera = 1
 
+    private val tag = "MainActivity"
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
         preview = findViewById(R.id.preview)
-        lifecycle.addObserver(preview)
 
         checkPermission()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        preview.stop()
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
@@ -42,6 +49,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startCamera() {
+        Log.i(tag, "call start camera")
         assert(ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
         preview.open()
     }
