@@ -55,8 +55,7 @@ class CameraPreview @JvmOverloads constructor(
 
     fun stop() {
         Log.i(tag, "stop preview")
-
-        // TODO
+        
         camera?.stopPreview()
         camera?.release()
         camera = null
