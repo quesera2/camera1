@@ -82,6 +82,10 @@ class CameraPreview @JvmOverloads constructor(
             camera.setDisplayOrientation(displayAngle)
             val params = camera.parameters
             params.setRotation(angle)
+            if (params.supportedFocusModes.contains(Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE)) {
+                Log.d(tag, "support continuous auto focus.")
+                params.focusMode = Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE
+            }
             camera.parameters = params
             desiredPictureSize(camera)
             setupConstraint()
