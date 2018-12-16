@@ -6,9 +6,7 @@ import android.animation.ArgbEvaluator
 import android.animation.ValueAnimator
 import android.content.Context
 import android.content.res.Configuration
-import android.graphics.ImageFormat
-import android.graphics.Rect
-import android.graphics.YuvImage
+import android.graphics.*
 import android.hardware.Camera
 import android.hardware.Camera.CameraInfo
 import android.util.AttributeSet
@@ -81,13 +79,7 @@ class CameraPreview @JvmOverloads constructor(
         val doTakePicture = { outerCamera: Camera ->
             onShutter()
             outerCamera.setOneShotPreviewCallback { data, innerCamera ->
-                val previewSize = innerCamera.parameters.previewSize
-                val (width, height) = previewSize.width to previewSize.height
-
-                val yuvImage = YuvImage(data, ImageFormat.NV21, width, height, null)
-                val stream = ByteArrayOutputStream()
-                yuvImage.compressToJpeg(Rect(0, 0, width, height), 50, stream)
-                val jpeg = stream.toByteArray()
+                val jpeg = createJpeg(innerCamera, data)
                 handler(jpeg)
             }
         }
@@ -236,9 +228,39 @@ class CameraPreview @JvmOverloads constructor(
         }
     }
 
+    private fun createJpeg(camera: Camera, data: ByteArray): ByteArray {
+        val previewSize = camera.parameters.previewSize
+        val (width, height) = previewSize.width to previewSize.height
+        val yuvImage = YuvImage(data, ImageFormat.NV21, width, height, null)
+
+        // 画面の向きに応じて回転方向を変える
+        val rotatedImage = yuvImage.toBitmap(90.0f)
+
+        // 圧縮を行う
+        val stream = ByteArrayOutputStream()
+        rotatedImage.compress(Bitmap.CompressFormat.JPEG, 50, stream)
+        try {
+            return stream.toByteArray()
+        } finally {
+            rotatedImage.recycle()
+        }
+    }
+
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         super.onLayout(changed, left, top, right, bottom)
         startIfReady()
+    }
+
+    private fun YuvImage.toBitmap(orientation: Float = 0.0f): Bitmap {
+        val stream = ByteArrayOutputStream()
+        this.compressToJpeg(Rect(0, 0, width, height), 100, stream)
+
+        val matrix = Matrix()
+        matrix.postRotate(orientation)
+        val bytes = stream.toByteArray()
+
+        val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+        return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
     }
 
     private inner class Callback : SurfaceHolder.Callback {
