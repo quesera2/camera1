@@ -6,6 +6,9 @@ import android.animation.ArgbEvaluator
 import android.animation.ValueAnimator
 import android.content.Context
 import android.content.res.Configuration
+import android.graphics.ImageFormat
+import android.graphics.Rect
+import android.graphics.YuvImage
 import android.hardware.Camera
 import android.hardware.Camera.CameraInfo
 import android.util.AttributeSet
@@ -15,6 +18,7 @@ import androidx.annotation.RequiresPermission
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.constraintlayout.widget.ConstraintSet
 import androidx.core.content.ContextCompat
+import java.io.ByteArrayOutputStream
 import kotlin.math.max
 
 
@@ -74,12 +78,18 @@ class CameraPreview @JvmOverloads constructor(
         // 多重に AutoFocus を実行しない
         if (executeAutoFocus) return
 
-        val doTakePicture = { innerCamera: Camera ->
-            innerCamera.takePicture(this, null, null, Camera.PictureCallback { bytes, _ ->
-                handler(bytes)
-                // restart preview if needed
-                // camera.startPreview()
-            })
+        val doTakePicture = { outerCamera: Camera ->
+            onShutter()
+            outerCamera.setOneShotPreviewCallback { data, innerCamera ->
+                val previewSize = innerCamera.parameters.previewSize
+                val (width, height) = previewSize.width to previewSize.height
+
+                val yuvImage = YuvImage(data, ImageFormat.NV21, width, height, null)
+                val stream = ByteArrayOutputStream()
+                yuvImage.compressToJpeg(Rect(0, 0, width, height), 50, stream)
+                val jpeg = stream.toByteArray()
+                handler(jpeg)
+            }
         }
 
         val supportAutoFocus = camera.parameters
@@ -95,7 +105,6 @@ class CameraPreview @JvmOverloads constructor(
         } else {
             doTakePicture(camera)
         }
-
     }
 
     private fun startIfReady() {
@@ -123,32 +132,36 @@ class CameraPreview @JvmOverloads constructor(
                 Log.d(tag, "support continuous auto focus.")
                 params.focusMode = Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE
             }
-            params.jpegQuality = 50
-            val size = desiredPictureSize(camera)
-            params.setPictureSize(size.width, size.height)
-            Log.d(tag, "picture size ${size.width}, ${size.height}")
-
+            val previewSize = getDesiredPreviewSize(camera, 1500)
+            params.setPreviewSize(previewSize.width, previewSize.height)
             camera.parameters = params
-            setupConstraint()
+            setupConstraint(previewSize)
         }
         this.camera = camera
     }
 
-    private fun setupConstraint() {
+    private fun getDesiredPreviewSize(camera: Camera, requiredSize: Int): Camera.Size {
+        return camera.parameters
+            .supportedPreviewSizes
+            .mapNotNull {
+                val shortSide = max(it.width, it.height)
+                if (shortSide <= requiredSize) shortSide to it else null
+            }
+            .maxBy { it.first }
+            ?.second!!
+    }
+
+    private fun setupConstraint(previewSize: Camera.Size) {
         val set = ConstraintSet()
         set.clone(root)
 
-        val previewSize = camera?.parameters?.previewSize
-        val (width, height) = if (previewSize != null) {
-            Log.d(tag, "previewSize ${previewSize.width},${previewSize.height}")
-            previewSize.width.toFloat() to previewSize.height.toFloat()
+        val (width, height) = if (isPortraitMode) {
+            previewSize.height to previewSize.width
         } else {
-            320.0f to 240.0f
-        }.let { (width, height) ->
-            // Swap width and height sizes when in portrait, since it will be rotated 90 degrees
-            if (isPortraitMode) height to width else width to height
+            previewSize.width to previewSize.height
         }
 
+        Log.d(tag, "constraint: $width:$height")
         set.setDimensionRatio(surfaceView.id, "$width:$height")
         set.applyTo(root)
     }
@@ -178,20 +191,6 @@ class CameraPreview @JvmOverloads constructor(
             val angle = (cameraInfo.orientation - degrees + 360) % 360
             angle to angle
         }
-    }
-
-    private fun desiredPictureSize(camera: Camera): Camera.Size {
-        // 長辺が requireSize より短い PictureSize を探す
-        val requiredSize = 800
-        val parameters = camera.parameters
-        return parameters
-            .supportedPictureSizes
-            .mapNotNull {
-                val shortSide = max(it.width, it.height)
-                if (shortSide <= requiredSize) shortSide to it else null
-            }
-            .maxBy { it.first }
-            ?.second!!
     }
 
     override fun onShutter() {
