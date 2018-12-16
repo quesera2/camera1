@@ -134,10 +134,28 @@ class CameraPreview @JvmOverloads constructor(
             }
             val previewSize = getDesiredPreviewSize(camera, 1500)
             params.setPreviewSize(previewSize.width, previewSize.height)
+            val (minFps, maxFps) = selectPreviewFpsRange(camera, 30.0f)
+            params.setPreviewFpsRange(minFps, maxFps)
             camera.parameters = params
             setupConstraint(previewSize)
         }
         this.camera = camera
+    }
+
+    private fun selectPreviewFpsRange(camera: Camera, desiredPreviewFps: Float): Pair<Int, Int> {
+        val desiredPreviewFpsScaled = (desiredPreviewFps * 1000.0f).toInt()
+        val availablePreviewFpsRange = camera.parameters.supportedPreviewFpsRange
+        val bestFps = availablePreviewFpsRange
+            .map {
+                val deltaMin = desiredPreviewFpsScaled - it[Camera.Parameters.PREVIEW_FPS_MIN_INDEX]
+                val deltaMax = desiredPreviewFpsScaled - it[Camera.Parameters.PREVIEW_FPS_MAX_INDEX]
+                Math.abs(deltaMin) + Math.abs(deltaMax) to it
+            }
+            .minBy { it.first }
+            ?.second
+            ?: throw RuntimeException()
+
+        return bestFps[Camera.Parameters.PREVIEW_FPS_MIN_INDEX] to bestFps[Camera.Parameters.PREVIEW_FPS_MAX_INDEX]
     }
 
     private fun getDesiredPreviewSize(camera: Camera, requiredSize: Int): Camera.Size {
