@@ -7,12 +7,10 @@ import android.hardware.Camera
 import android.hardware.Camera.CameraInfo
 import android.util.AttributeSet
 import android.util.Log
-import android.view.Surface
-import android.view.SurfaceHolder
-import android.view.SurfaceView
-import android.view.WindowManager
-import android.widget.FrameLayout
+import android.view.*
 import androidx.annotation.RequiresPermission
+import androidx.constraintlayout.widget.ConstraintLayout
+import androidx.constraintlayout.widget.ConstraintSet
 import androidx.core.content.ContextCompat
 import kotlin.math.max
 
@@ -22,11 +20,12 @@ class CameraPreview @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
     defStyle: Int = 0
-) : FrameLayout(context, attrs, defStyle) {
+) : ConstraintLayout(context, attrs, defStyle) {
 
     private val tag = "CameraPreview"
 
-    private val surfaceView: SurfaceView = SurfaceView(context)
+    private val root: ConstraintLayout
+    private val surfaceView: SurfaceView
 
     private var camera: Camera? = null
 
@@ -37,8 +36,11 @@ class CameraPreview @JvmOverloads constructor(
         get() = resources.configuration.orientation != Configuration.ORIENTATION_LANDSCAPE
 
     init {
+        LayoutInflater.from(context).inflate(R.layout.view_camera_preview, this, true)
+
+        root = findViewById(R.id.root)
+        surfaceView = findViewById(R.id.surface)
         surfaceView.holder.addCallback(Callback())
-        addView(surfaceView)
     }
 
     @RequiresPermission(Manifest.permission.CAMERA)
@@ -83,9 +85,28 @@ class CameraPreview @JvmOverloads constructor(
             params.setRotation(angle)
             camera.parameters = params
             desiredPictureSize(camera)
-            requestLayout()
+            setupConstraint()
         }
         this.camera = camera
+    }
+
+    private fun setupConstraint() {
+        val set = ConstraintSet()
+        set.clone(root)
+
+        val previewSize = camera?.parameters?.previewSize
+        val (width, height) = if (previewSize != null) {
+            Log.d(tag, "previewSize ${previewSize.width},${previewSize.height}")
+            previewSize.width.toFloat() to previewSize.height.toFloat()
+        } else {
+            320.0f to 240.0f
+        }.let { (width, height) ->
+            // Swap width and height sizes when in portrait, since it will be rotated 90 degrees
+            if (isPortraitMode) height to width else width to height
+        }
+
+        set.setDimensionRatio(surfaceView.id, "$width:$height")
+        set.applyTo(root)
     }
 
     private fun findBackCameraId(): Pair<Int, CameraInfo> = (0..Camera.getNumberOfCameras())
@@ -131,38 +152,6 @@ class CameraPreview @JvmOverloads constructor(
         if (size != null) {
             parameters.setPictureSize(size.width, size.height)
             Log.d(tag, "picture size ${size.width}, ${size.height}")
-        }
-    }
-
-    override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
-
-        val previewSize = camera?.parameters?.previewSize
-        var (width, height) = if (previewSize != null) {
-            previewSize.width.toFloat() to previewSize.height.toFloat()
-        } else {
-            320.0f to 240.0f
-        }
-
-        // Swap width and height sizes when in portrait, since it will be rotated 90 degrees
-        if (isPortraitMode) {
-            width = height.also { height = width }
-        }
-
-        val layoutWidth = (right - left).toFloat()
-        val layoutHeight = (bottom - top).toFloat()
-
-
-        val fitHeight = layoutWidth / width * height
-        val (childWidth, childHeight) = if (fitHeight > layoutHeight) {
-            // If height is too tall using fit width, does fit height instead.
-            (layoutHeight / height * width) to layoutHeight
-        } else {
-            // Computes height and width for potentially doing fit width.
-            layoutWidth to fitHeight
-        }
-
-        for (i in 0 until childCount) {
-            getChildAt(i).layout(0, 0, childWidth.toInt(), childHeight.toInt())
         }
     }
 
