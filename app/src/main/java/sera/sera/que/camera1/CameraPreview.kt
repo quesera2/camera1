@@ -102,9 +102,12 @@ class CameraPreview @JvmOverloads constructor(
                 Log.d(tag, "support continuous auto focus.")
                 params.focusMode = Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE
             }
-            params.jpegQuality = 100
+            params.jpegQuality = 50
+            val size = desiredPictureSize(camera)
+            params.setPictureSize(size.width, size.height)
+            Log.d(tag, "picture size ${size.width}, ${size.height}")
+
             camera.parameters = params
-            desiredPictureSize(camera)
             setupConstraint()
         }
         this.camera = camera
@@ -156,23 +159,18 @@ class CameraPreview @JvmOverloads constructor(
         }
     }
 
-    private fun desiredPictureSize(camera: Camera) {
+    private fun desiredPictureSize(camera: Camera): Camera.Size {
         // 長辺が requireSize より短い PictureSize を探す
-        val requiredSize = 1500
+        val requiredSize = 800
         val parameters = camera.parameters
-        val size = parameters
+        return parameters
             .supportedPictureSizes
             .mapNotNull {
                 val shortSide = max(it.width, it.height)
                 if (shortSide <= requiredSize) shortSide to it else null
             }
             .maxBy { it.first }
-            ?.second
-
-        if (size != null) {
-            parameters.setPictureSize(size.width, size.height)
-            Log.d(tag, "picture size ${size.width}, ${size.height}")
-        }
+            ?.second!!
     }
 
     override fun onShutter() {
@@ -200,6 +198,11 @@ class CameraPreview @JvmOverloads constructor(
         }
     }
 
+    override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+        super.onLayout(changed, left, top, right, bottom)
+        startIfReady()
+    }
+
     private inner class Callback : SurfaceHolder.Callback {
         override fun surfaceCreated(holder: SurfaceHolder?) {
             surfaceAvailable = true
@@ -210,6 +213,7 @@ class CameraPreview @JvmOverloads constructor(
         }
 
         override fun surfaceDestroyed(holder: SurfaceHolder?) {
+            surfaceAvailable = false
         }
     }
 }

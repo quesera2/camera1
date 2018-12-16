@@ -27,6 +27,10 @@ class MainActivity : AppCompatActivity() {
             setOnClickListener { preview.takePicture(this@MainActivity::onTakePicture) }
         }
 
+    }
+
+    override fun onStart() {
+        super.onStart()
         checkPermission()
     }
 
@@ -60,6 +64,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun onTakePicture(data: ByteArray) {
+        // 雑に作ってるので 1MB を超えると落ちる
         Log.i(tag, "size: ${Formatter.formatFileSize(this, data.size.toLong())}")
+        imageActivityIntentOf(this, data).also { startActivity(it) }
     }
 }
