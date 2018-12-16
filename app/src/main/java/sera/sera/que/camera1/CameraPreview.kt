@@ -55,10 +55,21 @@ class CameraPreview @JvmOverloads constructor(
 
     fun stop() {
         Log.i(tag, "stop preview")
-        
+
         camera?.stopPreview()
         camera?.release()
         camera = null
+    }
+
+    fun takePicture(handler: ((ByteArray) -> Unit)) {
+        val camera = camera ?: throw RuntimeException("take picture without setup camera.")
+
+        camera.takePicture(null, null, null,
+            Camera.PictureCallback { bytes, _ ->
+                handler(bytes)
+                // restart preview if needed
+                // camera.startPreview()
+            })
     }
 
     private fun startIfReady() {
@@ -86,6 +97,7 @@ class CameraPreview @JvmOverloads constructor(
                 Log.d(tag, "support continuous auto focus.")
                 params.focusMode = Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE
             }
+            params.jpegQuality = 100
             camera.parameters = params
             desiredPictureSize(camera)
             setupConstraint()

@@ -3,10 +3,12 @@ package sera.sera.que.camera1
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.text.format.Formatter
 import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import com.google.android.material.floatingactionbutton.FloatingActionButton
 
 class MainActivity : AppCompatActivity() {
 
@@ -21,6 +23,9 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         preview = findViewById(R.id.preview)
+        findViewById<FloatingActionButton>(R.id.button_picture).apply {
+            setOnClickListener { preview.takePicture(this@MainActivity::onTakePicture) }
+        }
 
         checkPermission()
     }
@@ -52,5 +57,9 @@ class MainActivity : AppCompatActivity() {
         Log.i(tag, "call start camera")
         assert(ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
         preview.open()
+    }
+
+    private fun onTakePicture(data: ByteArray) {
+        Log.i(tag, "size: ${Formatter.formatFileSize(this, data.size.toLong())}")
     }
 }
