@@ -36,6 +36,8 @@ class CameraPreview @JvmOverloads constructor(
     private var startRequested: Boolean = false
     private var surfaceAvailable: Boolean = false
 
+    private var executeAutoFocus: Boolean = false
+
     private val isPortraitMode: Boolean
         get() = resources.configuration.orientation != Configuration.ORIENTATION_LANDSCAPE
 
@@ -66,15 +68,34 @@ class CameraPreview @JvmOverloads constructor(
         camera = null
     }
 
+    @Synchronized
     fun takePicture(handler: ((ByteArray) -> Unit)) {
         val camera = camera ?: throw RuntimeException("take picture without setup camera.")
+        // 多重に AutoFocus を実行しない
+        if (executeAutoFocus) return
 
-        camera.takePicture(this, null, null,
-            Camera.PictureCallback { bytes, _ ->
+        val doTakePicture = { innerCamera: Camera ->
+            innerCamera.takePicture(this, null, null, Camera.PictureCallback { bytes, _ ->
                 handler(bytes)
                 // restart preview if needed
                 // camera.startPreview()
             })
+        }
+
+        val supportAutoFocus = camera.parameters
+            .supportedFocusModes
+            .contains(Camera.Parameters.FOCUS_MODE_AUTO)
+
+        if (supportAutoFocus) {
+            executeAutoFocus = true
+            camera.autoFocus { _, innerCamera ->
+                doTakePicture(innerCamera)
+                executeAutoFocus = false
+            }
+        } else {
+            doTakePicture(camera)
+        }
+
     }
 
     private fun startIfReady() {
