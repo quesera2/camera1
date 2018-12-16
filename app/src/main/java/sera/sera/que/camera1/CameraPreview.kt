@@ -1,6 +1,9 @@
 package sera.sera.que.camera1
 
 import android.Manifest
+import android.animation.AnimatorSet
+import android.animation.ArgbEvaluator
+import android.animation.ValueAnimator
 import android.content.Context
 import android.content.res.Configuration
 import android.hardware.Camera
@@ -20,11 +23,12 @@ class CameraPreview @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
     defStyle: Int = 0
-) : ConstraintLayout(context, attrs, defStyle) {
+) : ConstraintLayout(context, attrs, defStyle), Camera.ShutterCallback {
 
     private val tag = "CameraPreview"
 
     private val root: ConstraintLayout
+    private val shutter: View
     private val surfaceView: SurfaceView
 
     private var camera: Camera? = null
@@ -39,6 +43,7 @@ class CameraPreview @JvmOverloads constructor(
         LayoutInflater.from(context).inflate(R.layout.view_camera_preview, this, true)
 
         root = findViewById(R.id.root)
+        shutter = findViewById(R.id.shutter)
         surfaceView = findViewById(R.id.surface)
         surfaceView.holder.addCallback(Callback())
     }
@@ -64,7 +69,7 @@ class CameraPreview @JvmOverloads constructor(
     fun takePicture(handler: ((ByteArray) -> Unit)) {
         val camera = camera ?: throw RuntimeException("take picture without setup camera.")
 
-        camera.takePicture(null, null, null,
+        camera.takePicture(this, null, null,
             Camera.PictureCallback { bytes, _ ->
                 handler(bytes)
                 // restart preview if needed
@@ -167,6 +172,31 @@ class CameraPreview @JvmOverloads constructor(
         if (size != null) {
             parameters.setPictureSize(size.width, size.height)
             Log.d(tag, "picture size ${size.width}, ${size.height}")
+        }
+    }
+
+    override fun onShutter() {
+        val white = ContextCompat.getColor(context, android.R.color.white)
+//        val black = ContextCompat.getColor(context, android.R.color.black)
+        val transparent = ContextCompat.getColor(context, android.R.color.transparent)
+
+        val flash = ValueAnimator.ofObject(ArgbEvaluator(), transparent, white).apply {
+            duration = 100
+            repeatCount = 1
+            repeatMode = ValueAnimator.REVERSE
+            addUpdateListener { animator -> shutter.setBackgroundColor(animator.animatedValue as Int) }
+        }
+//        val fadeOut = ValueAnimator.ofObject(ArgbEvaluator(), transparent, black).apply {
+//            duration = 200
+//            startDelay = 800
+//            addUpdateListener { animator -> shutter.setBackgroundColor(animator.animatedValue as Int) }
+//        }
+        AnimatorSet().apply {
+            playTogether(
+                flash
+//                ,fadeOut
+            )
+            start()
         }
     }
 
